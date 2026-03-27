@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <link rel="icon" href="/images/favicon.ico" type="image/x-icon">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Carel Junson</title>
@@ -338,7 +339,7 @@ body {
 </style>
 </head>
 <body>
-<audio id="snd" preload="auto"><source src="data:audio/mpeg;base64,type="audio/mpeg"></audio>
+<audio id="snd" preload="auto"><source src="gta-san-andreas-menu-sound-1.mp3" type="audio/mpeg"></audio>
 <audio id="hoverSnd" preload="auto"><source src="gta-san-andreas-menu-sound-1.mp3" type="audio/mpeg"></audio>
 <div class="flash" id="flash"></div>
 <div class="page-bg">
@@ -475,8 +476,9 @@ body {
 
     <div class="ca-section">
       <div class="ca-title">Contract Address:</div>
-      <div class="ca-display clk" id="caBox" onclick="copyCA()">
-        0xC4R3LJU4S0N...GR0V3STR33T1992
+      <div class="ca-display clk" id="caBox" onclick="copyCA()" style="position:relative;overflow:hidden;">
+        <span id="caText">0xC4R3LJU4S0N...GR0V3STR33T1992</span>
+        <span id="caCopied" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#1a3a10,#0d2008);color:#7fff7f;letter-spacing:3px;opacity:0;transition:opacity 0.25s;">✓ COPIED</span>
       </div>
     </div>
 
@@ -490,49 +492,61 @@ body {
 </div>
 
 <script>
-// Sound
+// ── Click sound ──────────────────────────────────────────────────────────────
 const snd = document.getElementById('snd');
 function playClick() {
-  snd.currentTime = 0;
-  snd.play().catch(()=>{});
+  if (snd && snd.readyState >= 2) { snd.currentTime = 0; snd.play().catch(()=>{}); }
   const f = document.getElementById('flash');
   f.classList.add('on');
   setTimeout(()=>f.classList.remove('on'), 80);
 }
 document.querySelectorAll('.clk, .top-nav a, #caBox').forEach(el => el.addEventListener('click', playClick));
 
-// Hover sound — unlock audio on first any interaction
-const hoverSnd = document.getElementById('hoverSnd');
-let audioUnlocked = false;
+// ── Hover sound ───────────────────────────────────────────────────────────────
+let hoverAudio = null;
 
-function unlockAudio() {
-  if (audioUnlocked) return;
-  audioUnlocked = true;
-  hoverSnd.muted = true;
-  hoverSnd.play().then(() => {
-    hoverSnd.pause();
-    hoverSnd.currentTime = 0;
-    hoverSnd.muted = false;
-  }).catch(()=>{});
+function initAudio() {
+  if (hoverAudio) return;
+  hoverAudio = new Audio('gta-san-andreas-menu-sound-1.mp3');
+  hoverAudio.load();
 }
-
-document.addEventListener('click', unlockAudio, { once: true });
-document.addEventListener('mousemove', unlockAudio, { once: true });
-document.addEventListener('keydown', unlockAudio, { once: true });
 
 function playHover() {
-  if (!audioUnlocked) return;
-  hoverSnd.currentTime = 0;
-  hoverSnd.play().catch(()=>{});
+  if (!hoverAudio) return;
+  const clone = hoverAudio.cloneNode();
+  clone.play().catch(()=>{});
 }
 
-document.querySelectorAll('.clk, .top-nav a, #caBox').forEach(el => el.addEventListener('mouseenter', playHover));
+document.addEventListener('click', initAudio, { once: true });
+
+document.querySelectorAll('.clk, .top-nav a, #caBox').forEach(el =>
+  el.addEventListener('mouseenter', playHover)
+);
+
+// ── Copy Contract Address ─────────────────────────────────────────────────────
+const CA_ADDRESS = '0xC4R3LJU4S0N...GR0V3STR33T1992'; // ← замени на реальный адрес
 
 function copyCA() {
-  navigator.clipboard?.writeText('0xC4R3LJU4S0N...GR0V3STR33T1992').catch(()=>{});
-  const b = document.getElementById('caBox');
-  b.textContent = '✓ COPIED TO CLIPBOARD';
-  setTimeout(()=>{ b.textContent = '0xC4R3LJU4S0N...GR0V3STR33T1992'; }, 2000);
+  // copy text
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(CA_ADDRESS).catch(() => fallbackCopy());
+  } else {
+    fallbackCopy();
+  }
+  // animate
+  const copied = document.getElementById('caCopied');
+  copied.style.opacity = '1';
+  setTimeout(() => { copied.style.opacity = '0'; }, 1800);
+}
+
+function fallbackCopy() {
+  const ta = document.createElement('textarea');
+  ta.value = CA_ADDRESS;
+  ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0;';
+  document.body.appendChild(ta);
+  ta.focus(); ta.select();
+  try { document.execCommand('copy'); } catch(e) {}
+  document.body.removeChild(ta);
 }
 
 // THREE.JS
@@ -564,17 +578,6 @@ function copyCA() {
   const fill = new THREE.HemisphereLight(0xff8800, 0x3a2000, 0.5); scene.add(fill);
   const rim = new THREE.DirectionalLight(0xff6600, 0.8); rim.position.set(-10,5,-10); scene.add(rim);
 
-  // Parse GLB
-  const glbB64 = "data:model/gltf-binary;base64,
-  const base64 = glbB64.split(',')[1];
-  
-  function b64ToBuffer(b64) {
-    const bin = atob(b64);
-    const buf = new ArrayBuffer(bin.length);
-    const view = new Uint8Array(buf);
-    for(let i=0;i<bin.length;i++) view[i]=bin.charCodeAt(i);
-    return buf;
-  }
   
   function parseGLB(buffer) {
     const dv = new DataView(buffer);
@@ -651,30 +654,36 @@ function copyCA() {
     const mh = new THREE.MeshStandardMaterial({color:0x9B8460,roughness:0.8});
     const mr2= new THREE.MeshStandardMaterial({color:0x6a3a22,roughness:0.9});
     const mg = new THREE.MeshStandardMaterial({color:0x4a6a30,roughness:1});
-    g.add(Object.assign(new THREE.Mesh(new THREE.PlaneGeometry(50,50),mg),{rotation:{x:-Math.PI/2}}));
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(50,50),mg);
+    ground.rotation.x = -Math.PI/2;
+    g.add(ground);
     [[-8,3],[-8,-4],[-8,10],[8,3],[8,-4],[8,10]].forEach(([x,z])=>{
       const h=new THREE.Mesh(new THREE.BoxGeometry(4.5,3,4),mh); h.position.set(x,1.5,z); g.add(h);
       const roof=new THREE.Mesh(new THREE.ConeGeometry(3.5,1.8,4),mr2); roof.position.set(x,3.4,z); roof.rotation.y=Math.PI/4; g.add(roof);
     });
-    const road=new THREE.Mesh(new THREE.PlaneGeometry(6,50),mr); road.rotation.x=-Math.PI/2; road.position.y=0.02; g.add(road);
+    const road=new THREE.Mesh(new THREE.PlaneGeometry(6,50),mr);
+    road.rotation.x=-Math.PI/2; road.position.y=0.02; g.add(road);
     return g;
   }
 
-  try {
-    const buf = b64ToBuffer(base64);
-    const {gltf, bin} = parseGLB(buf);
-    const grp = buildScene(gltf, bin);
-    const box = new THREE.Box3().setFromObject(grp);
-    const center = box.getCenter(new THREE.Vector3());
-    const size = box.getSize(new THREE.Vector3());
-    const scale = 18 / Math.max(size.x,size.y,size.z);
-    grp.scale.setScalar(scale);
-    grp.position.sub(center.multiplyScalar(scale));
-    scene.add(grp);
-  } catch(e) {
-    console.warn('GLB parse failed, using fallback',e);
-    scene.add(fallbackScene());
-  }
+  // Load GLB from file
+  fetch('model.glb')
+    .then(r => r.arrayBuffer())
+    .then(buf => {
+      const {gltf, bin} = parseGLB(buf);
+      const grp = buildScene(gltf, bin);
+      const box = new THREE.Box3().setFromObject(grp);
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
+      const scale = 18 / Math.max(size.x,size.y,size.z);
+      grp.scale.setScalar(scale);
+      grp.position.sub(center.multiplyScalar(scale));
+      scene.add(grp);
+    })
+    .catch(e => {
+      console.warn('GLB load failed, using fallback', e);
+      scene.add(fallbackScene());
+    });
 
   // Orbit
   let drag=false, prev={x:0,y:0}, sph={theta:0.4,phi:1.1,r:28};
@@ -758,7 +767,11 @@ function copyCA() {
     margin-left: 550px;
     width: 700px;
     ">
-
+<img src="/images/memes.png" style="margin-top: 100px;
+    width: 200px;
+    margin-left: 790px;
+    left: 10px;
+    position: absolute;">
     </div>
 
 <!-- RUNNING TICKER DIVIDER -->
